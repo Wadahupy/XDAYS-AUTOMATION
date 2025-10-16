@@ -33,7 +33,7 @@ if uploaded_files:
 
         st.divider()
         st.subheader("🧾 Consolidated Data Preview")
-        st.dataframe(consolidated_df.head(10), use_container_width=True)
+        st.dataframe(consolidated_df.head(10), width='stretch')
 
 
         # Download button
