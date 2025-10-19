@@ -25,7 +25,7 @@ HEADER_MAPPING = {
     "MOBILE_NO": "MOBILE_NO",
     "TU_RESULT": "TU",
     "EMAIL": "EMAIL",
-    "AMOUNT_OUTSTANDING": "TCL",  # ✅ TCL in master = AMOUNT_OUTSTANDING in raw
+    "AMOUNT_OUTSTANDING": "OB",  # ✅
     "XDAYS": "PDA",
     "LAST_PAYMENT_AMT": "LAST PAYMENT AMOUNT",
     "LAST_PAYMENT_DATE": "LAST_PAYMENT_DATE",
@@ -175,7 +175,11 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
     # =====================
     match = re.search(r"c(\d+)", filename.lower())
     cycle = match.group(1) if match else "N/A"
-    df["COLLECTION_CYCLE"] = f"{cycle}"
+    # Add leading zero if it's a single digit (e.g., "5" → "05")
+    if cycle.isdigit() and len(cycle) == 1:
+        cycle = f"0{cycle}"
+
+    df["COLLECTION_CYCLE"] = cycle
 
     # =====================
     # 🧹 Clean CUST_ID
@@ -320,6 +324,7 @@ def align_headers(df: pd.DataFrame) -> pd.DataFrame:
 def consolidate_files(uploaded_files) -> Tuple[pd.DataFrame, Dict]:
     if not uploaded_files:
         return None, {}
+    
 
     stats = {"total_files": len(uploaded_files), "processed_files": 0, "skipped_files": [], "total_rows": 0}
     all_dfs = []
@@ -341,43 +346,7 @@ def consolidate_files(uploaded_files) -> Tuple[pd.DataFrame, Dict]:
         st.error("❌ No valid files to consolidate.")
         return None, stats
 
-    # First, ensure all DataFrames have consistent dtypes for shared columns
-    common_cols = set.intersection(*[set(df.columns) for df in all_dfs])
-    dtypes = {}
-    
-    for col in common_cols:
-        # Get all non-null dtypes for this column across DataFrames
-        col_dtypes = set(df[col].dtype for df in all_dfs if not df[col].isna().all())
-        if col_dtypes:  # If we have any non-empty columns
-            # Prefer string dtype for object/string columns
-            if any(pd.api.types.is_string_dtype(dtype) for dtype in col_dtypes):
-                dtypes[col] = 'string'
-            # For numeric columns, use the most permissive type
-            elif any(pd.api.types.is_numeric_dtype(dtype) for dtype in col_dtypes):
-                if any(pd.api.types.is_float_dtype(dtype) for dtype in col_dtypes):
-                    dtypes[col] = 'float64'
-                else:
-                    dtypes[col] = 'int64'
-    
-    # Convert dtypes in all DataFrames before concatenation
-    for df in all_dfs:
-        for col, dtype in dtypes.items():
-            if col in df.columns:
-                try:
-                    df[col] = df[col].astype(dtype)
-                except Exception:
-                    # If conversion fails, default to string
-                    df[col] = df[col].astype('string')
-
     consolidated = pd.concat(all_dfs, ignore_index=True)
-    
-    # Ensure all columns from COLUMN_SEQUENCE are present with proper types
-    for col in COLUMN_SEQUENCE:
-        if col not in consolidated.columns:
-            consolidated[col] = pd.Series(dtype='string')
-        elif consolidated[col].isna().all():  # If column is all NA
-            consolidated[col] = consolidated[col].astype('string')
-    
     consolidated = consolidated.reindex(columns=COLUMN_SEQUENCE)
     return consolidated, stats
 
