@@ -25,26 +25,36 @@ HEADER_MAPPING = {
     "MOBILE_NO": "MOBILE_NO",
     "TU_RESULT": "TU",
     "EMAIL": "EMAIL",
-    "AMOUNT_OUTSTANDING": "OB",
+    "AMOUNT_OUTSTANDING": "TCL",  # ✅ TCL in master = AMOUNT_OUTSTANDING in raw
     "XDAYS": "PDA",
-    "LAST_PAYMENT_AMT": "LAST_PAYMENT_AMOUNT",
+    "LAST_PAYMENT_AMT": "LAST PAYMENT AMOUNT",
     "LAST_PAYMENT_DATE": "LAST_PAYMENT_DATE",
     "RISK": "RISK",
     "AGING": "AGING",
     "HO_FLAG": "HO_FLAG",
     "BIRTHDATE": "BIRTHDATE",
-    "PTP_AMOUNT": "PTP_AMOUNT",
+    "PTP_AMOUNT": "PTP AMOUNT",
     "PTP_DATE": "PTP_DATE",
-    "TPAP_DD": "TPAP_DD",
+    "TPAP_DD": "TPAP DD",
     "UNIBANKER": "UNIBANKER",
     "CLASSIFICATION": "CLASSIFICATION",
-    "LAST_DUE_DATE (manual)": "LAST_DUE_DATE",
-    "Balance_Type (100k up, etc)": "BALANCE_TYPE",
+    "LAST_DUE_DATE (manual)": "LAST DUE DATE",
+    "Balance_Type (100k up, etc)": "Balance Type",
     "BLOCK_CODE": "BLOCK_CODE",
+    "BLOCK CODE": "BLOCK_CODE",
     "MEMO_LINE": "MEMO_LINE",
     "INHOUSE": "INHOUSE",
+    "D_CUST_OPN": "D_CUST_OPN",  # ✅ Ensure captured when directly named this way
 
-    # Alternate header names
+    
+    # Alternate header names for D_CUST_OPN
+    "DATE_CUST_OPENED": "D_CUST_OPN",
+    "CUST_OPEN_DATE": "D_CUST_OPN",
+    "DATE_OPENED": "D_CUST_OPN",
+    "OPEN_DATE": "D_CUST_OPN",
+    "D CUST OPEN": "D_CUST_OPN",
+
+    # Alternate header names for other financial columns
     "BOS/CB": "BOS",
     "BOS_CB": "BOS",
     "BOSCB": "BOS",
@@ -57,23 +67,24 @@ HEADER_MAPPING = {
 }
 
 
+
 # ----------------------------
 # MASTER COLUMN SEQUENCE
 # ----------------------------
 COLUMN_SEQUENCE: List[str] = [
     "CUST_ID", "CUST_NAME", "QUEUE", "OFC", "HOME", "MOBILE_NO", "TU", "ADDRESS",
-    "EMAIL", "GENDER", "TCL", "OB", "BOS", "AOD", "MAD", "PDA", "LAST_PAYMENT_AMOUNT",
+    "EMAIL", "GENDER", "TCL", "OB", "BOS", "AOD", "MAD", "PDA", "LAST PAYMENT AMOUNT",
     "LAST_PAYMENT_DATE", "RESPONSE_CODE", "LAST_CONTACT_DATE", "BEHAVIOURAL_SCORE",
     "DELINQUENCY_STRING", "ADA_ACCOUNT", "DEBIT_AMOUNT_PREFERENCE", "MS", "DOSRI_FLAG",
     "EMPLOYEE_CODE", "RM_NUMBER", "COLLECTION_CYCLE", "UNIT_CODE", "UNIT_DESC",
     "LAST_ACTION_CODE", "RISK", "AGING", "HO_FLAG", "BIRTHDATE", "UNIBANKER",
     "NS_with_tranx", "TPAP", "CRISPR", "BLOCK_CODE", "MEMO_LINE", "D_CUST_OPN",
-    "AREA_CODE", "PTP_DATE", "CATEGORY_CLASSIF", "LAST_DUE_DATE", "BALANCE_TYPE",
-    "HO_AMOUNT", "PRIO_LIST", "PTP_AMOUNT", "CONTACTED_BY", "CLASSIFICATION",
-    "TPAP_DD", "AGENCY", "CLASSIF_2", "INHOUSE", "EMAIL_NOTI", "CATEGORY",
-    "SPOUSE_NUMBER", "PTP_FROM", "ADDRESS_1", "ADDRESS_2", "ADDRESS_3",
-    "ADEPTRA_RESULT", "USER_FLG8", "P_RESON_CD", "TP_PDR_Code", "EMPLOYMENT",
-    "EXCLUSION", "PREDEL_NOTIF", "PUSHBACK_STAT", "ACQUISITION_CHANNEL",
+    "AREA CODE", "PTP DATE", "CATEGORY/CLASSIF", "LAST DUE DATE", "Balance Type",
+    "HO AMOUNT", "PRIO LIST", "PTP AMOUNT", "CONTACTED BY", "CLASSIFICATION",
+    "TPAP DD", "AGENCY", "CLASSIF 2", "INHOUSE", "EMAIL NOTI", "CATEGORY",
+    "SPOUSE NUMBER", "PTP FROM", "ADDRESS_1", "ADDRESS_2", "ADDRESS_3",
+    "ADEPTRA RESULT", "USER_FLG8", "P_RESON_CD", "TP_PDR_Code", "EMPLOYMENT",
+    "EXCLUSION", "PREDEL NOTIF", "PUSHBACK STAT", "ACQUISITION CHANNEL",
     "OCCUPATION", "TYPE"
 ]
 
@@ -122,13 +133,20 @@ def read_excel_file(uploaded_file) -> Tuple[pd.DataFrame, List[str]]:
             decrypted = uploaded_file.read()
             decrypted = BytesIO(decrypted)
 
-        # 🧠 Choose engine automatically
+        # � Choose engine automatically
         engine = "xlrd" if file_ext == "xls" else "openpyxl"
         decrypted.seek(0)
         df = pd.read_excel(decrypted, engine=engine)
 
         # 🧹 Clean header names
         df.columns = [str(c).strip() for c in df.columns]
+
+        # Convert all object/string columns to string dtype immediately after reading
+        for col in df.select_dtypes(include=['object']).columns:
+            df[col] = df[col].astype(str).replace(['nan', 'None', 'NaT', 'null'], np.nan)
+            if pd.notna(df[col]).any():  # Only convert if column has non-NA values
+                df[col] = df[col].astype('string')
+
         return df, list(df.columns)
 
     except Exception as e:
@@ -143,55 +161,53 @@ def read_excel_file(uploaded_file) -> Tuple[pd.DataFrame, List[str]]:
 def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
     """
     Cleans and standardizes key columns based on the user's specifications.
-    - Adds leading zeros to CUST_ID if missing.
-    - Fixes MOBILE_NO format (e.g., 639xxxxxxxxx → 09xxxxxxxxx).
+    - Adds leading zeros to CUST_ID if missing (simulating =0&CUST_ID in Excel).
+    - Fixes MOBILE_NO format.
     - Removes invalid values like '????', '00', '0', or errors.
     - Standardizes date columns to mm/dd/yyyy.
     - Adds COLLECTION_CYCLE column (detected from filename, e.g., c27 → 27).
     """
     df = df.copy()
 
+
     # =====================
     # 🔍 Extract collection cycle from filename
     # =====================
     match = re.search(r"c(\d+)", filename.lower())
     cycle = match.group(1) if match else "N/A"
-    df["COLLECTION_CYCLE"] = f"C{cycle}"
+    df["COLLECTION_CYCLE"] = f"{cycle}"
 
     # =====================
     # 🧹 Clean CUST_ID
     # =====================
     if "CUST_ID" in df.columns:
         df["CUST_ID"] = df["CUST_ID"].astype(str).str.strip()
-        
-        # Remove invalid characters
-        df["CUST_ID"] = df["CUST_ID"].str.replace("????", "", regex=False)
-        
-        # Preserve leading zeros and prevent scientific notation loss
-        def clean_cust_id(x):
-            if pd.isna(x) or str(x) in ['nan', 'None', '', 'NaT']:
-                return np.nan
-            x = str(x)
-            # Remove decimal point if it's .0
-            if re.match(r"^\d+\.0+$", x):
-                x = x.split(".")[0]
-            # Add leading zero if missing and not already 15+ digits
-            if x.isdigit() and not x.startswith("0") and len(x) < 15:
-                return f"0{x}"
-            return x
-        
-        df["CUST_ID"] = df["CUST_ID"].apply(clean_cust_id)
+        df["CUST_ID"] = df["CUST_ID"].replace(["nan", "None", "NaT", "", "??", "????"], np.nan)
+
+        # Create temporary column simulating Excel formula =0&CUST_ID
+        df["TEMP_CUST_ID"] = df["CUST_ID"].apply(lambda x: f"0{x}" if pd.notna(x) and not str(x).startswith("0") else x)
+
+        # Handle scientific or float-like values (e.g., 2.01002E+12 or 201002201707538.0)
+        df["TEMP_CUST_ID"] = df["TEMP_CUST_ID"].apply(
+            lambda x: str(int(float(x))) if isinstance(x, str) and re.match(r"^\d+\.0+$", x) else x
+        )
+
+        # Copy values back to main CUST_ID
+        df["CUST_ID"] = df["TEMP_CUST_ID"]
+
+        # Drop the temporary column (like deleting the Excel helper column)
+        df.drop(columns=["TEMP_CUST_ID"], inplace=True)
 
     # =====================
     # 📱 Clean MOBILE_NO
     # =====================
     if "MOBILE_NO" in df.columns:
         df["MOBILE_NO"] = df["MOBILE_NO"].astype(str).str.strip()
-        
+
         def normalize_mobile(num):
             if pd.isna(num) or str(num) in ['nan', 'None', '', 'NaT', '????', '00', '0']:
                 return np.nan
-            num = re.sub(r"\D", "", str(num))  # keep digits only
+            num = re.sub(r"\D", "", str(num))
             if not num:
                 return np.nan
             if num.startswith("639") and len(num) == 12:
@@ -205,92 +221,97 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
         df["MOBILE_NO"] = df["MOBILE_NO"].apply(normalize_mobile)
 
     # =====================
-    # 📅 Clean date columns (check both original and mapped names)
+    # 📅 Clean date columns
     # =====================
     date_column_mapping = {
         "LAST_PAYMENT_DATE": "LAST_PAYMENT_DATE",
         "LAST_CONTACT_DATE": "LAST_CONTACT_DATE",
-        "PTP DATE": "PTP_DATE",
-        "PTP_DATE": "PTP_DATE",
+        "PTP DATE": "PTP DATE",
+        "PTP_DATE": "PTP DATE",
         "BIRTHDATE": "BIRTHDATE",
-        "LAST DUE DATE": "LAST_DUE_DATE",
-        "LAST_DUE_DATE": "LAST_DUE_DATE",
-        "TPAP DD": "TPAP_DD",
-        "TPAP_DD": "TPAP_DD"
+        "LAST DUE DATE": "LAST DUE DATE",
+        "LAST_DUE_DATE": "LAST DUE DATE",
+        "TPAP DD": "TPAP DD",
+        "TPAP_DD": "TPAP DD",
+        "D_CUST_OPN": "D CUST OPEN"
     }
 
     for col in df.columns:
         if col in date_column_mapping or col in date_column_mapping.values():
             df[col] = pd.to_datetime(df[col], errors="coerce")
-            # Convert to string format, handling NaT
             df[col] = df[col].apply(lambda x: x.strftime("%m/%d/%Y") if pd.notna(x) else np.nan)
-    
-    # ----------------------------
-    # TYPE COLUMN CONVERSION
-    # ----------------------------
-    NUMERIC_COLUMNS = ["OB", "BOS", "AOD", "MAD", "PDA", "LAST_PAYMENT_AMOUNT", 
-                       "PTP_AMOUNT", "HO_AMOUNT", "TCL"]
-    
-    STRING_COLUMNS = [
-        "OFC", "HOME", "MOBILE_NO", "CUST_ID", "EMAIL", 
-        "COLLECTION_CYCLE", "UNIT_CODE", "EMPLOYEE_CODE",
-        "GENDER", "RISK", "TYPE", "CATEGORY", "CLASSIFICATION",
-        "TU", "ADDRESS", "QUEUE", "UNIT_DESC", "BLOCK_CODE",
-        "MEMO_LINE", "UNIBANKER", "AGING", "BALANCE_TYPE",
-        "INHOUSE", "CATEGORY_CLASSIF", "SPOUSE_NUMBER", "CUST_NAME",
-        "RM_NUMBER", "LAST_ACTION_CODE", "HO_FLAG", "AGENCY",
-        "AREA_CODE", "CONTACTED_BY", "CLASSIF_2"
-    ]
 
-    # Handle numeric columns
+    # =====================
+    # 🔢 Numeric columns
+    # =====================
+    NUMERIC_COLUMNS = ["OB", "BOS", "AOD", "MAD", "PDA", "LAST PAYMENT AMOUNT",
+                       "PTP AMOUNT", "HO AMOUNT", "TCL"]
+
     for col in NUMERIC_COLUMNS:
         if col in df.columns:
-            # Convert to string, clean, then to numeric
             df[col] = df[col].astype(str).str.replace(r"[^\d\.\-]", "", regex=True)
             df[col] = df[col].replace(["", "nan", "None", "NaT"], np.nan)
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Handle string columns - convert to object dtype (most compatible)
+    # =====================
+    # 🔤 String columns
+    # =====================
+    # Define all string columns including both variations of headers
+    STRING_COLUMNS = [
+        "MOBILE_NO", "CUST_ID", "EMAIL", "COLLECTION_CYCLE", "UNIT_CODE", 
+        "EMPLOYEE_CODE", "GENDER", "RISK", "TYPE", "CATEGORY", 
+        "CLASSIFICATION", "TU", "ADDRESS", "QUEUE", "UNIT_DESC", 
+        "BLOCK_CODE", "BLOCK CODE", "MEMO_LINE", "UNIBANKER", "AGING", 
+        "BALANCE_TYPE", "INHOUSE", "CATEGORY_CLASSIF", "SPOUSE_NUMBER", 
+        "CUST_NAME", "RM_NUMBER", "LAST_ACTION_CODE", "HO_FLAG", "AGENCY", 
+        "AREA_CODE", "CONTACTED_BY", "CLASSIF_2", "OFC", "HOME", 
+        "OFFICE_PH", "HOME_PH"
+    ]
+
     for col in STRING_COLUMNS:
         if col in df.columns:
-            # First convert to string
+            # Handle invalid values consistently
+            invalid_values = ["nan", "None", "NaT", "????", "??"]
+            if col in ["OFC", "HOME", "OFFICE_PH", "HOME_PH"]:  # Phone number columns
+                invalid_values.extend(["0", "00"])
+            
+            # Convert to string, handle invalid values, and ensure consistent type
             df[col] = df[col].astype(str)
-            # Replace invalid string representations with NaN
-            invalid_values = ["nan", "None", "NaT", "????", "??????????????????????????????", "??"]
-            # Use apply instead of replace to avoid downcasting warning
-            df[col] = df[col].apply(lambda x: np.nan if pd.isna(x) or str(x).strip() in invalid_values else x)
-            # Keep as string type for better compatibility
-            df[col] = df[col].apply(lambda x: str(x) if pd.notna(x) else np.nan)
-
-    # Clean remaining object columns
-    for col in df.columns:
-        if df[col].dtype == 'object' and col not in STRING_COLUMNS + NUMERIC_COLUMNS:
-            df[col] = df[col].astype(str)
-            invalid_values = ["nan", "None", "NaT", "????", "??????????????????????????????", "??"]
-            for invalid in invalid_values:
-                df[col] = df[col].replace(invalid, np.nan)
-            df[col] = df[col].astype(object)
+            df[col] = df[col].apply(lambda x: np.nan if str(x).strip() in invalid_values else str(x).strip())
+            if pd.notna(df[col]).any():  # Only convert if column has non-NA values
+                df[col] = df[col].astype('string')
 
     return df
+
 
 # ----------------------------
 # ⚙️ ALIGN HEADERS
 # ----------------------------
 def align_headers(df: pd.DataFrame) -> pd.DataFrame:
-    """Align bank headers to internal headers."""
+    """Align bank headers to internal headers with normalization (handles spaces, case, underscores)."""
+
+    def normalize(header: str) -> str:
+        return re.sub(r'[\s_]+', '', str(header).strip().upper())
+
+    # Create a normalized lookup dict for HEADER_MAPPING
+    normalized_mapping = {normalize(k): v for k, v in HEADER_MAPPING.items()}
+
     new_cols = []
     for col in df.columns:
-        clean_col = col.strip()
-        mapped_col = HEADER_MAPPING.get(clean_col, clean_col)
+        norm_col = normalize(col)
+        mapped_col = normalized_mapping.get(norm_col, col.strip())
         new_cols.append(mapped_col)
+
     df.columns = new_cols
 
-    # Add missing columns
+    # Add missing columns from master template
     for col in COLUMN_SEQUENCE:
         if col not in df.columns:
             df[col] = np.nan
 
+    # Reorder columns according to master
     return df.reindex(columns=COLUMN_SEQUENCE)
+
 
 
 # ----------------------------
@@ -320,7 +341,43 @@ def consolidate_files(uploaded_files) -> Tuple[pd.DataFrame, Dict]:
         st.error("❌ No valid files to consolidate.")
         return None, stats
 
+    # First, ensure all DataFrames have consistent dtypes for shared columns
+    common_cols = set.intersection(*[set(df.columns) for df in all_dfs])
+    dtypes = {}
+    
+    for col in common_cols:
+        # Get all non-null dtypes for this column across DataFrames
+        col_dtypes = set(df[col].dtype for df in all_dfs if not df[col].isna().all())
+        if col_dtypes:  # If we have any non-empty columns
+            # Prefer string dtype for object/string columns
+            if any(pd.api.types.is_string_dtype(dtype) for dtype in col_dtypes):
+                dtypes[col] = 'string'
+            # For numeric columns, use the most permissive type
+            elif any(pd.api.types.is_numeric_dtype(dtype) for dtype in col_dtypes):
+                if any(pd.api.types.is_float_dtype(dtype) for dtype in col_dtypes):
+                    dtypes[col] = 'float64'
+                else:
+                    dtypes[col] = 'int64'
+    
+    # Convert dtypes in all DataFrames before concatenation
+    for df in all_dfs:
+        for col, dtype in dtypes.items():
+            if col in df.columns:
+                try:
+                    df[col] = df[col].astype(dtype)
+                except Exception:
+                    # If conversion fails, default to string
+                    df[col] = df[col].astype('string')
+
     consolidated = pd.concat(all_dfs, ignore_index=True)
+    
+    # Ensure all columns from COLUMN_SEQUENCE are present with proper types
+    for col in COLUMN_SEQUENCE:
+        if col not in consolidated.columns:
+            consolidated[col] = pd.Series(dtype='string')
+        elif consolidated[col].isna().all():  # If column is all NA
+            consolidated[col] = consolidated[col].astype('string')
+    
     consolidated = consolidated.reindex(columns=COLUMN_SEQUENCE)
     return consolidated, stats
 
@@ -346,12 +403,25 @@ def prepare_dataframe_for_display(df: pd.DataFrame) -> pd.DataFrame:
     return display_df
 
 def generate_excel_download(df: pd.DataFrame, filename: str) -> bytes:
-    """Generate Excel file for download, preserving data types."""
-    output = io.BytesIO()
-    
+    """Generate Excel file for download, ensuring clean data output."""
     # Create a copy for export
     export_df = df.copy()
     
+    # Replace all forms of NA/null values with empty strings
+    export_df = export_df.replace({
+        pd.NA: "",
+        "<NA>": "",
+        "nan": "",
+        "None": "",
+        "NaT": ""
+    })
+    export_df = export_df.fillna("")
+    
+    # Convert all string columns to ensure no <NA> values remain
+    for col in export_df.select_dtypes(include=['string', 'object']).columns:
+        export_df[col] = export_df[col].astype(str).replace({"<NA>": "", "nan": "", "None": ""})
+    
+    output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Cleaned_Aligned")
     
