@@ -136,24 +136,33 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
         df["CUST_ID"] = df["TEMP_CUST_ID"]
         df.drop(columns=["TEMP_CUST_ID"], inplace=True)
 
-    # =====================
-    # 📱 Clean MOBILE_NO
+        # =====================
+    # 📱 Clean MOBILE_NO (detect and normalize any format)
     # =====================
     if "MOBILE_NO" in df.columns:
         df["MOBILE_NO"] = df["MOBILE_NO"].astype(str).str.strip()
 
         def normalize_mobile(num):
-            if pd.isna(num) or str(num) in ['nan', 'None', '', 'NaT', '????', '00', '0']:
+            if pd.isna(num):
                 return np.nan
+
+            # Remove all non-digit characters
             num = re.sub(r"\D", "", str(num))
-            if not num:
-                return np.nan
-            if num.startswith("639") and len(num) == 12:
-                return "0" + num[2:]
-            elif len(num) == 10:
-                return "0" + num
-            elif len(num) == 11 and num.startswith("09"):
+
+            # Remove leading country codes and redundant prefixes
+            # Examples it handles:
+            # +63917..., 63917..., 00963917..., 0917..., 917...
+            if num.startswith("00"):
+                num = num[2:]
+            if num.startswith("63"):
+                num = "0" + num[2:]
+            elif num.startswith("9") and len(num) == 10:
+                num = "0" + num
+
+            # Only keep if it’s a valid PH mobile number
+            if re.fullmatch(r"09\d{9}", num):
                 return num
+
             return np.nan
 
         df["MOBILE_NO"] = df["MOBILE_NO"].apply(normalize_mobile)

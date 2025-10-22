@@ -141,9 +141,6 @@ if uploaded_file:
                     st.markdown("### 🚫 Columns from Raw File Not in Reference Template")
                     not_found_df = pd.DataFrame(not_found_columns, columns=["Unmapped Columns"])
                     st.dataframe(not_found_df, width='stretch')
-            
-            with st.expander("🧾 Preview Final Aligned Data"):
-                 st.dataframe(pd.DataFrame(not_found_columns, columns=["Unmapped Columns"]), width='stretch')
                 
 
             # ============================================================

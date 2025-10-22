@@ -45,12 +45,6 @@ venv.bak/
 .DS_Store
 Thumbs.db
 
-# Project specific
-*.xlsx
-*.xls
-!template*.xlsx  # Keep template files if any
-aligned_output.xlsx
-consolidated_output.xlsx
 
 # Logs and databases
 *.log
