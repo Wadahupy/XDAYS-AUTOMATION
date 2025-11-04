@@ -33,6 +33,7 @@ venv.bak/
 .streamlit/
 .streamlit/config.toml
 .streamlit/secrets.toml
+.devcontainer/
 
 # IDE specific files
 .idea/
