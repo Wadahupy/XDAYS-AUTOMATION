@@ -8,17 +8,6 @@ import re
 st.title("📱 TU Numbers Splitter")
 st.divider()
 
-st.markdown("""
-Upload an Excel file that contains a column with TU numbers (multiple numbers in one cell, separated by a symbol like `;`).
-Select the CH CODE column (the key) and the TU NUMBERS column, set the separator, then run the splitter.
-The output will contain columns:
-- CH CODE
-- CONTACT 1.
-- CONTACT 2.
-- CONTACT 3.
-... depending on the maximum number of TU numbers found in any row.
-""")
-
 uploaded_file = st.file_uploader(
     "📤 Upload an Excel file (single file)",
     type=["xlsx", "xls"]
