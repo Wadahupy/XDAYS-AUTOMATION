@@ -53,6 +53,7 @@ else:
 
                 # Normalize column names in the output
                 working.columns = ["CH CODE", "TU_RAW"]
+                
 
                 # Helper to split and clean
                 def split_and_clean(cell):
@@ -82,14 +83,26 @@ else:
                         if not digits:
                             return None
 
+                        # --- Keep landline numbers (7 to 9 digits) ---
+                        if 7 <= len(digits) <= 9 and not digits.startswith(("0", "63")):
+                            return digits
+
                         # Handle international formats +63, 0063, or 63
                         if digits.startswith("63") and len(digits) >= 12:
                             digits = "0" + digits[-10:]
                         elif digits.startswith("0") and len(digits) == 11:
                             pass  # already valid
+                        elif len(digits) == 10 and not digits.startswith("0"):
+                            digits = "0" + digits
 
                         # Return only if it looks valid
-                        return digits if len(digits) == 11 and digits.startswith("0") else None
+                          # --- Final validation ---
+                        if len(digits) == 11 and digits.startswith("0"):
+                            return digits
+                        elif 7 <= len(digits) <= 9:  # still allow landlines here as fallback
+                            return digits
+                        else:
+                            return None
 
                     for p in parts:
                         if trim_spaces:
