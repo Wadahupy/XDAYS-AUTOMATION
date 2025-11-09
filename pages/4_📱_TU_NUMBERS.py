@@ -6,13 +6,7 @@ from io import BytesIO
 from utils.helpers import read_excel_file
 
 st.title("📞 TU Numbers Splitter & Validator")
-st.write("""
-This tool:
-1. Splits TU numbers using your chosen separator  
-2. Auto-formats and validates PH phone numbers (mobile or landline)  
-3. Returns **one row per CH CODE** with columns **CONTACT 1, CONTACT 2, ...**  
-4. Lets you download valid and invalid numbers separately  
-""")
+
 st.divider()
 
 uploaded_file = st.file_uploader("📤 Upload Excel file", type=["xlsx", "xls"])
@@ -37,61 +31,68 @@ else:
 
         st.write("---")
 
-        # ---------------- Helper functions ---------------- #
+         # ---------------- Helper functions ---------------- #
         def to_str(val):
             if pd.isna(val):
                 return ""
             return str(val).strip()
 
         def clean_value(val):
-            """Remove all non-digit characters except '*'."""
+            """Clean unwanted characters and remove emails or text."""
             val = to_str(val)
-            return re.sub(r"[^\d*]", "", val)
+            # Remove email-like substrings
+            val = re.sub(r"\S+@\S+\.[A-Za-z]{2,}", "", val)
+            # Remove words like 'none', 'null', 'nan'
+            if val.lower() in ["none", "nan", "null", "nat"]:
+                return ""
+            # Keep only digits and optional *
+            val = re.sub(r"[^\d*]", "", val)
+            return val
 
         def auto_format_number(val):
-            """Auto-format PH phone numbers including *0, *09, *63 patterns."""
+            """Auto-format PH phone numbers including *0, *09, *63 patterns, and reject invalid ones."""
             val = clean_value(val)
             if val == "":
                 return ""
 
+            # Remove leading asterisk if present
             if val.startswith("*"):
-                val = val[1:]  # remove leading *
+                val = val[1:]
 
-            # *63XXXXXXXXX or 63XXXXXXXXXX → mobile
-            if val.startswith("63") and len(val) >= 12:
-                return "0" + val[-10:]
+            # Reject obvious invalid prefixes like 00, 000
+            if re.match(r"^00+", val):
+                return ""
 
-            # 9XXXXXXXXX → mobile
-            if re.fullmatch(r"9\d{9}", val):
-                return "0" + val
+            # Handle country code format (63XXXXXXXXXX)
+            if val.startswith("63") and len(val) == 12:
+                val = "0" + val[2:]
 
-            # Starts with 0 → already local
-            if re.fullmatch(r"0\d{10}", val):  # mobile
-                return val
-            if re.fullmatch(r"0\d{9}", val):   # landline
-                return val
+            # Handle 9XXXXXXXXX → 09XXXXXXXXX (mobile)
+            elif re.fullmatch(r"9\d{9}", val):
+                val = "0" + val
 
-            # 10 digits → assume landline
-            if re.fullmatch(r"\d{10}", val):
-                return val
+            # Handle landline (7–9 digits) → add 0
+            elif re.fullmatch(r"\d{7,9}", val):
+                val = "0" + val
 
-            # 7–9 digits → assume landline, add 0
-            if re.fullmatch(r"\d{7,9}", val):
-                return "0" + val
-
-            # 11 digits but not starting with 0 → fix
-            if re.fullmatch(r"\d{11}", val):
-                return "0" + val[1:]
+            # Keep as is if already starts with 0 and correct length
+            elif re.fullmatch(r"0\d{9,10}", val):
+                pass
+            else:
+                return ""
 
             return val
 
         def is_valid_phone(val):
             """Check if number is valid mobile (11 digits) or landline (10 digits)."""
             val = to_str(val)
-            pattern_mobile = re.compile(r"^0\d{10}$")
-            pattern_landline = re.compile(r"^0\d{9}$")
-            return bool(pattern_mobile.match(val) or pattern_landline.match(val))
+            if not val or re.match(r"^00+", val):  # reject 00 or 000 prefixes
+                return False
 
+            pattern_mobile = re.compile(r"^09\d{9}$")  # e.g., 09171234567
+            pattern_landline = re.compile(r"^0\d{8,9}$")  # e.g., 0286871817
+
+            return bool(pattern_mobile.match(val) or pattern_landline.match(val))
         # ---------------- Main process ---------------- #
         if st.button("🚀 Process TU NUMBERS"):
             working = df[[ch_col, tu_col]].copy()
