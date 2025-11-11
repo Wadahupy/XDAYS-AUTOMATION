@@ -34,6 +34,7 @@ for col in reference_df.columns:
         alt_names = [a.strip() for a in alternates[1:] if str(a).strip()]
         header_mapping[main_header] = alt_names
 
+
 # ============================================================
 # FUNCTIONS
 # ============================================================

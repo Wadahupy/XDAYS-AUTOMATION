@@ -118,7 +118,7 @@ else:
 
                 valid_row = {"CH CODE": ch_code}
                 for i, num in enumerate(valid_nums, start=1):
-                    valid_row[f"CONTACT {i}"] = num
+                    valid_row[f"TU {i}"] = num
                 all_valid.append(valid_row)
 
                 for bad in invalid_nums:

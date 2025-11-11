@@ -136,7 +136,7 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
         df["CUST_ID"] = df["TEMP_CUST_ID"]
         df.drop(columns=["TEMP_CUST_ID"], inplace=True)
 
-        # =====================
+    # =====================
     # 📱 Clean MOBILE_NO (detect and normalize any format)
     # =====================
     if "MOBILE_NO" in df.columns:
@@ -166,6 +166,40 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
             return np.nan
 
         df["MOBILE_NO"] = df["MOBILE_NO"].apply(normalize_mobile)
+
+    # ============================================================
+    # CUSTOM LANDLINE CLEANING FUNCTION
+    # ============================================================
+    def clean_landline_number(num: str):
+        """Clean and standardize landline numbers based on custom rules."""
+        if pd.isna(num):
+            return ""
+
+        num = str(num).strip().replace(" ", "").replace("-", "")
+        if not num.isdigit():
+            return num  # leave text or non-numeric as is
+
+        # Rule 1: 8-digit Manila number (not identical digits)
+        if len(num) == 8:
+            if len(set(num)) != 1:  # not like 88888888
+                return f"02{num}"  # add area code
+            else:
+                return num  # identical digits like 99999999 stay as is
+
+        # Rule 2: 10-digit Provincial landline (starts with 0)
+        if len(num) == 10:
+            return num  # keep as is (provincial)
+
+        # Rule 3: Starts with 6302 and 12 digits → Manila line
+        if len(num) == 12 and num.startswith("6302"):
+            return "02" + num[-8:]  # remove 63 and keep last 8 digits
+
+        # Rule 4: Starts with 630 and 12 digits → Provincial line
+        if len(num) == 12 and num.startswith("630"):
+            return "0" + num[-9:]  # remove 63 and keep last 9 digits
+
+        # Default: return unchanged
+        return num
 
 
         # =====================
