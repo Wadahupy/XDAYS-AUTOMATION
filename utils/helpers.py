@@ -106,7 +106,7 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
     - Adds leading zeros to CUST_ID if missing (simulating =0&CUST_ID in Excel).
     - Fixes MOBILE_NO format.
     - Removes invalid values like '????', '00', '0', or errors.
-    - Standardizes date columns to mm/dd/yyyy.
+    - Standardizes date columns to MM/DD/YYYY.
     - Adds COLLECTION_CYCLE column (detected from filename, e.g., c27 → 27).
     """
     df = df.copy()
@@ -126,18 +126,15 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
     if "CUST_ID" in df.columns:
         df["CUST_ID"] = df["CUST_ID"].astype(str).str.strip()
         df["CUST_ID"] = df["CUST_ID"].replace(["nan", "None", "NaT", "", "??", "????"], np.nan)
-
         df["TEMP_CUST_ID"] = df["CUST_ID"].apply(lambda x: f"0{x}" if pd.notna(x) and not str(x).startswith("0") else x)
-
         df["TEMP_CUST_ID"] = df["TEMP_CUST_ID"].apply(
             lambda x: str(int(float(x))) if isinstance(x, str) and re.match(r"^\d+\.0+$", x) else x
         )
-
         df["CUST_ID"] = df["TEMP_CUST_ID"]
         df.drop(columns=["TEMP_CUST_ID"], inplace=True)
 
     # =====================
-    # 📱 Clean MOBILE_NO (detect and normalize any format)
+    # 📱 Clean MOBILE_NO
     # =====================
     if "MOBILE_NO" in df.columns:
         df["MOBILE_NO"] = df["MOBILE_NO"].astype(str).str.strip()
@@ -145,101 +142,66 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
         def normalize_mobile(num):
             if pd.isna(num):
                 return np.nan
-
-            # Remove all non-digit characters
             num = re.sub(r"\D", "", str(num))
-
-            # Remove leading country codes and redundant prefixes
-            # Examples it handles:
-            # +63917..., 63917..., 00963917..., 0917..., 917...
             if num.startswith("00"):
                 num = num[2:]
             if num.startswith("63"):
                 num = "0" + num[2:]
             elif num.startswith("9") and len(num) == 10:
                 num = "0" + num
-
-            # Only keep if it’s a valid PH mobile number
-            if re.fullmatch(r"09\d{9}", num):
-                return num
-
-            return np.nan
+            return num if re.fullmatch(r"09\d{9}", num) else np.nan
 
         df["MOBILE_NO"] = df["MOBILE_NO"].apply(normalize_mobile)
 
     # ============================================================
-    # CUSTOM LANDLINE CLEANING FUNCTION
+    # ☎️ Clean LANDLINE
     # ============================================================
     def clean_landline_number(num: str):
-        """Clean and standardize landline numbers based on custom rules."""
         if pd.isna(num):
             return ""
-
         num = str(num).strip().replace(" ", "").replace("-", "")
         if not num.isdigit():
-            return num  # leave text or non-numeric as is
-
-        # Rule 1: 8-digit Manila number (not identical digits)
+            return num
         if len(num) == 8:
-            if len(set(num)) != 1:  # not like 88888888
-                return f"02{num}"  # add area code
-            else:
-                return num  # identical digits like 99999999 stay as is
-
-        # Rule 2: 10-digit Provincial landline (starts with 0)
+            return f"02{num}" if len(set(num)) != 1 else num
         if len(num) == 10:
-            return num  # keep as is (provincial)
-
-        # Rule 3: Starts with 6302 and 12 digits → Manila line
+            return num
         if len(num) == 12 and num.startswith("6302"):
-            return "02" + num[-8:]  # remove 63 and keep last 8 digits
-
-        # Rule 4: Starts with 630 and 12 digits → Provincial line
+            return "02" + num[-8:]
         if len(num) == 12 and num.startswith("630"):
-            return "0" + num[-9:]  # remove 63 and keep last 9 digits
-
-        # Default: return unchanged
+            return "0" + num[-9:]
         return num
 
+    # ============================================================
+    # 📅 Standardize DATE columns to MM/DD/YYYY
+    # ============================================================
+    DATE_COLUMNS = [
+        "LAST_PAYMENT_DATE", "LAST_CONTACT_DATE", "PTP DATE", "PTP_DATE",
+        "BIRTHDATE", "LAST DUE DATE", "LAST_DUE_DATE",
+        "TPAP DD", "TPAP_DD", "D_CUST_OPN", "D CUST OPEN"
+    ]
 
-        # =====================
-        # 📅 Clean & standardize date columns
-        # =====================
-        DATE_COLUMNS = [
-            "LAST_PAYMENT_DATE", "LAST_CONTACT_DATE", "PTP DATE", "PTP_DATE",
-            "BIRTHDATE", "LAST DUE DATE", "LAST_DUE_DATE",
-            "TPAP DD", "TPAP_DD", "D_CUST_OPN", "D CUST OPEN"
-        ]
+    def normalize_name(name: str) -> str:
+        return str(name).strip().lower().replace("_", " ")
 
-        def normalize_name(name: str) -> str:
-            """Normalize column names for flexible matching."""
-            return str(name).strip().lower().replace("_", " ")
+    def convert_any_date(value):
+        if pd.isna(value):
+            return np.nan
+        try:
+            if isinstance(value, (int, float)) and 1 < value < 60000:
+                value = pd.to_datetime("1899-12-30") + pd.to_timedelta(value, "D")
+            else:
+                value = pd.to_datetime(value, errors="coerce")
+            return value.strftime("%m/%d/%Y") if pd.notna(value) else np.nan
+        except Exception:
+            return np.nan
 
-        def convert_any_date(value):
-            """Convert Excel serials or date strings to mm/dd/yyyy."""
-            if pd.isna(value):
-                return np.nan
-            try:
-                # Handle Excel serial dates (within reasonable range)
-                if isinstance(value, (int, float)) and 1 < value < 60000:
-                    value = pd.to_datetime("1899-12-30") + pd.to_timedelta(value, "D")
-                else:
-                    value = pd.to_datetime(value, errors="coerce")
-                return value.strftime("%m/%d/%Y") if pd.notna(value) else np.nan
-            except Exception:
-                return np.nan
-
-        for col in df.columns:
-            if normalize_name(col) in [normalize_name(dc) for dc in DATE_COLUMNS]:
-                df[col] = df[col].apply(convert_any_date)
-
-
-
-
-
+    for col in df.columns:
+        if normalize_name(col) in [normalize_name(dc) for dc in DATE_COLUMNS]:
+            df[col] = df[col].apply(convert_any_date)
 
     # =====================
-    # 🔤 String columns
+    # 🔤 Clean string-type columns
     # =====================
     STRING_COLUMNS = [
         "MOBILE_NO", "CUST_ID", "EMAIL", "COLLECTION_CYCLE", "UNIT_CODE",
