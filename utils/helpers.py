@@ -125,7 +125,7 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
     # =====================
     if "CUST_ID" in df.columns:
         df["CUST_ID"] = df["CUST_ID"].astype(str).str.strip()
-        df["CUST_ID"] = df["CUST_ID"].replace(["nan", "None", "NaT", "", "??", "????"], np.nan)
+        df["CUST_ID"] = df["CUST_ID"].replace(["nan", "None", "NaT", "", "??", "??????????????????"], np.nan)
         df["TEMP_CUST_ID"] = df["CUST_ID"].apply(lambda x: f"0{x}" if pd.notna(x) and not str(x).startswith("0") else x)
         df["TEMP_CUST_ID"] = df["TEMP_CUST_ID"].apply(
             lambda x: str(int(float(x))) if isinstance(x, str) and re.match(r"^\d+\.0+$", x) else x
@@ -152,6 +152,37 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
             return num if re.fullmatch(r"09\d{9}", num) else np.nan
 
         df["MOBILE_NO"] = df["MOBILE_NO"].apply(normalize_mobile)
+
+    # =====================
+    # 📧 Clean EMAIL
+    # =====================
+    if "EMAIL" in df.columns:
+        def clean_email(email):
+            if pd.isna(email):
+                return np.nan
+
+            email = str(email).strip().lower()
+
+            # Remove sequences of "?" or zeros
+            if re.fullmatch(r"\?+", email) or re.fullmatch(r"0+", email):
+                return np.nan
+
+            # Remove placeholder invalid strings
+            if email in ["nan", "none", "nat", "", "null"]:
+                return np.nan
+
+            # Remove emails containing invalid characters
+            if re.search(r"[^a-z0-9@\._\-+]", email):
+                return np.nan
+
+            # Must contain @ and a domain
+            if "@" not in email or "." not in email.split("@")[-1]:
+                return np.nan
+
+            return email
+
+        df["EMAIL"] = df["EMAIL"].apply(clean_email)
+
 
     # ============================================================
     # ☎️ Clean LANDLINE
@@ -216,7 +247,7 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
 
     for col in STRING_COLUMNS:
         if col in df.columns:
-            invalid_values = ["nan", "None", "NaT", "????", "??"]
+            invalid_values = ["nan", "None", "NaT", "??????????????????", "??"]
             if col in ["OFC", "HOME", "OFFICE_PH", "HOME_PH"]:
                 invalid_values.extend(["0", "00"])
 
