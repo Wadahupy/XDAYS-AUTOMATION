@@ -133,8 +133,9 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
         df["CUST_ID"] = df["TEMP_CUST_ID"]
         df.drop(columns=["TEMP_CUST_ID"], inplace=True)
 
+
     # =====================
-    # 📱 Clean MOBILE_NO
+    # 📱 Clean MOBILE_NO  (SAFE + STABLE VERSION)
     # =====================
     if "MOBILE_NO" in df.columns:
         df["MOBILE_NO"] = df["MOBILE_NO"].astype(str).str.strip()
@@ -142,16 +143,43 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
         def normalize_mobile(num):
             if pd.isna(num):
                 return np.nan
-            num = re.sub(r"\D", "", str(num))
-            if num.startswith("00"):
-                num = num[2:]
-            if num.startswith("63"):
-                num = "0" + num[2:]
-            elif num.startswith("9") and len(num) == 10:
-                num = "0" + num
-            return num if re.fullmatch(r"09\d{9}", num) else np.nan
+
+            # Extract all digits only
+            digits = re.sub(r"\D", "", str(num))
+
+            if digits == "":
+                return np.nan
+
+            # --- Handle international format ---
+            # 00963XXXXXXXXX → 63XXXXXXXXX
+            if digits.startswith("00"):
+                digits = digits[2:]
+
+            # +63 format (if the "+" was removed)
+            if digits.startswith("63"):
+                digits = "0" + digits[2:]
+
+            # 9XXXXXXXXX → prepend 0
+            if digits.startswith("9") and len(digits) == 10:
+                digits = "0" + digits
+
+            # Excel sometimes converts numbers to scientific notation → remove leading zeros but keep format
+            if len(digits) > 11 and digits.endswith(".0"):
+                digits = digits[:-2]
+
+            # Final validation
+            if re.fullmatch(r"09\d{9}", digits):
+                return digits
+
+            # Still return digits instead of NaN (to avoid wiping mobile numbers)
+            # Only convert garbage to NaN
+            if len(digits) < 7:
+                return np.nan
+
+            return digits  # keep partially valid number instead of dropping it
 
         df["MOBILE_NO"] = df["MOBILE_NO"].apply(normalize_mobile)
+
 
     # =====================
     # 📧 Clean EMAIL
@@ -184,24 +212,56 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
         df["EMAIL"] = df["EMAIL"].apply(clean_email)
 
 
-    # ============================================================
-    # ☎️ Clean LANDLINE
-    # ============================================================
-    def clean_landline_number(num: str):
+    def clean_landline_number(num):
         if pd.isna(num):
-            return ""
-        num = str(num).strip().replace(" ", "").replace("-", "")
-        if not num.isdigit():
-            return num
+            return np.nan
+
+        num = str(num).strip()
+
+        # Remove unwanted characters
+        num = re.sub(r"[^\d]", "", num)  # keep digits only
+
+        if num == "":
+            return np.nan
+
+        # Remove leading "00" from international format
+        if num.startswith("00"):
+            num = num[2:]
+
+        # 632 + 8 digits → convert to 02XXXXXXXX
+        if num.startswith("632") and len(num) == 11:
+            return "02" + num[-8:]
+
+        # 63 + area + number → fix format
+        if num.startswith("63"):
+            num = "0" + num[2:]
+
+        # If 8 digits → Manila landline without area code
         if len(num) == 8:
-            return f"02{num}" if len(set(num)) != 1 else num
-        if len(num) == 10:
+            return "02" + num
+
+        # If 10 digits (02 + 8 digits) → valid PH landline
+        if len(num) == 10 and num.startswith("0"):
             return num
+
+        # If 9 digits (national format missing area prefix)
+        if len(num) == 9 and not num.startswith("0"):
+            return "0" + num
+
+        # If 12 digits: 6302XXXXXXXX or 630XXXXXXXXX
         if len(num) == 12 and num.startswith("6302"):
             return "02" + num[-8:]
         if len(num) == 12 and num.startswith("630"):
             return "0" + num[-9:]
+
+        # If still not standard — return as-is (don’t erase data)
+        LANDLINE_COLUMNS = ["OFC", "HOME"]
+
         return num
+
+        for col in LANDLINE_COLUMNS:
+            if col in df.columns:
+                df[col] = df[col].apply(clean_landline_number)
 
     # ============================================================
     # 📅 Standardize DATE columns to MM/DD/YYYY
