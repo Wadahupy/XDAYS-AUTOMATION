@@ -135,7 +135,7 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
 
 
     # =====================
-    # 📱 Clean MOBILE_NO  (SAFE + STABLE VERSION)
+    # 📱 Clean MOBILE_NO (FIXED)
     # =====================
     if "MOBILE_NO" in df.columns:
         df["MOBILE_NO"] = df["MOBILE_NO"].astype(str).str.strip()
@@ -144,39 +144,29 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
             if pd.isna(num):
                 return np.nan
 
-            # Extract all digits only
-            digits = re.sub(r"\D", "", str(num))
+            raw = str(num).strip()
 
-            if digits == "":
+            raw = raw.replace(".0", "")
+            raw = raw.replace(",", "")
+
+            if re.fullmatch(r"09\d{9}", raw):
+                return raw
+
+            num = re.sub(r"\D", "", raw)
+             # Too short to ever be valid
+            if len(num) < 10:
                 return np.nan
+             # Remove leading "00"
+            if num.startswith("00"):
+                num = num[2:]
+            # Convert 63XXXXXXXXXX → 09XXXXXXXXX
+            if num.startswith("63") and len(num) >= 12:
+                num = "0" + num[2:]
+            # Convert 9XXXXXXXXX → 09XXXXXXXXX
+            if num.startswith("9") and len(num) == 10:
+                num = "0" + num
 
-            # --- Handle international format ---
-            # 00963XXXXXXXXX → 63XXXXXXXXX
-            if digits.startswith("00"):
-                digits = digits[2:]
-
-            # +63 format (if the "+" was removed)
-            if digits.startswith("63"):
-                digits = "0" + digits[2:]
-
-            # 9XXXXXXXXX → prepend 0
-            if digits.startswith("9") and len(digits) == 10:
-                digits = "0" + digits
-
-            # Excel sometimes converts numbers to scientific notation → remove leading zeros but keep format
-            if len(digits) > 11 and digits.endswith(".0"):
-                digits = digits[:-2]
-
-            # Final validation
-            if re.fullmatch(r"09\d{9}", digits):
-                return digits
-
-            # Still return digits instead of NaN (to avoid wiping mobile numbers)
-            # Only convert garbage to NaN
-            if len(digits) < 7:
-                return np.nan
-
-            return digits  # keep partially valid number instead of dropping it
+            return num if re.fullmatch(r"09\d{9}", num) else np.nan
 
         df["MOBILE_NO"] = df["MOBILE_NO"].apply(normalize_mobile)
 
@@ -219,7 +209,7 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
         num = str(num).strip()
 
         # Remove unwanted characters
-        num = re.sub(r"[^\d]", "", num)  # keep digits only
+        num = re.sub(r"[^\d]", "", num)
 
         if num == "":
             return np.nan
@@ -318,7 +308,6 @@ def clean_data(df: pd.DataFrame, filename: str) -> pd.DataFrame:
 
     return df
 
-
 # ----------------------------
 # ⚙️ ALIGN HEADERS (using reference)
 # ----------------------------
@@ -343,7 +332,6 @@ def align_headers(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = np.nan
 
     return df.reindex(columns=column_sequence)
-
 
 # ----------------------------
 # 💾 DOWNLOAD EXCEL
