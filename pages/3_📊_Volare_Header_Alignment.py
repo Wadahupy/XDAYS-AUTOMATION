@@ -210,7 +210,7 @@ if uploaded_file:
             st.download_button(
                 label="📤 Download VOLARE Aligned File",
                 data=output.getvalue(),
-                file_name="VOLARE_aligned_output.xlsx",
+                file_name="BPI_CARDS_XDAYS_VOLARE_UPLOAD.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
