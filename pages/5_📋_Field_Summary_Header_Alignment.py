@@ -4,9 +4,7 @@ from io import BytesIO
 import re
 from datetime import datetime
 
-# ============================================================
-# PAGE CONFIG
-# ============================================================
+#--- Page Setup ---
 st.set_page_config(
     page_title="Field Summary Header Alignment",
     layout="wide",
@@ -17,9 +15,7 @@ st.title("📋 Field Summary Header Alignment")
 st.caption("Upload an Excel file to automatically align headers based on predefined mapping rules.")
 st.divider()
 
-# ============================================================
-# HEADER MAPPING RULES
-# ============================================================
+#--- Header Mapping Rules ---
 HEADER_MAPPING = {
     "BANK": "BANK",
     "PLACEMENT": "PLACEMENT",
@@ -71,9 +67,7 @@ MAIN_HEADERS = [
     "CYCLE",
 ]
 
-# ============================================================
-# HELPER FUNCTIONS
-# ============================================================
+# --- Helper Functions ---
 def normalize_header(header: str) -> str:
     """Normalize header: strip spaces, uppercase, remove dots."""
     normalized = str(header).strip().upper()
@@ -110,9 +104,7 @@ def find_mapped_header(uploaded_header: str, mapping_rules: dict) -> str:
     return None
 
 
-# ============================================================
-# 🔥 MODIFIED ALIGNMENT LOGIC (DO NOT ADD, DO NOT REORDER)
-# ============================================================
+#--- Main Alignment Function ---
 def align_headers(df: pd.DataFrame, mapping_rules: dict, main_headers: list) -> tuple:
     """
     Align headers to main output headers.
@@ -179,10 +171,7 @@ def generate_excel_download(df: pd.DataFrame) -> bytes:
     output.seek(0)
     return output.getvalue()
 
-
-# ============================================================
-# MAIN APP
-# ============================================================
+#--- File Upload ---
 uploaded_file = st.file_uploader("📁 Upload Excel file (.xlsx)", type=["xlsx"])
 
 if uploaded_file is not None:
@@ -195,9 +184,7 @@ if uploaded_file is not None:
         # ALIGNMENT PROCESSING
         aligned_df, report = align_headers(df, HEADER_MAPPING, MAIN_HEADERS)
 
-        # ============================================================
-        # PREVIEW ALIGNMENT
-        # ============================================================
+      # --- Preview Alignment Results ---
         st.subheader("🔄 Header Alignment Preview")
 
         col1, col2 = st.columns(2)
@@ -237,9 +224,7 @@ if uploaded_file is not None:
 
         st.divider()
 
-        # ============================================================
-        # VALIDATION REPORT
-        # ============================================================
+        # --- Validation Report ---
         st.subheader("⚠️ Validation Report")
 
         v1, v2 = st.columns(2)
@@ -256,9 +241,7 @@ if uploaded_file is not None:
 
         st.divider()
 
-        # ============================================================
-        # DATA PREVIEW
-        # ============================================================
+        # --- Aligned Data Preview ---
         st.subheader("📊 Aligned Data Preview")
         st.dataframe(aligned_df, use_container_width=True)
 

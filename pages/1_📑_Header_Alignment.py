@@ -6,16 +6,12 @@ from datetime import datetime
 from io import BytesIO
 from utils.helpers import read_excel_file, clean_data, generate_excel_download
 
-# ============================================================
-# PAGE CONFIG
-# ============================================================
+# --- Page Setup ---
 st.title("📑 Excel Header Auto Alignment")
 st.caption("Automatically align uploaded file headers using the reference template in `utils/reference/bpi_cards_xdays-header.xlsx`.")
 st.divider()
 
-# ============================================================
-# LOAD REFERENCE HEADER FILE
-# ============================================================
+# Load reference header mapping
 REFERENCE_PATH = os.path.join("utils", "reference", "bpi_cards_xdays-header.xlsx")
 
 if not os.path.exists(REFERENCE_PATH):
@@ -35,9 +31,7 @@ for col in reference_df.columns:
         header_mapping[main_header] = alt_names
 
 
-# ============================================================
-# FUNCTIONS
-# ============================================================
+#--- Helper Functions ---
 def get_mapped_header(column_name: str, header_mapping: dict):
     """Find mapped header for a given uploaded column."""
     normalized_col = str(column_name).strip().lower()
@@ -73,16 +67,14 @@ def export_to_excel(dataframe, sheet_name="Aligned Data"):
     return output
 
 
-# ============================================================
-# FILE UPLOAD
-# ============================================================
+#--- File Upload ---
 uploaded_file = st.file_uploader("📂 Upload an Excel file (.xlsx, .xls)", type=["xlsx", "xls"])
 
 if uploaded_file:
     df, headers = read_excel_file(uploaded_file)
 
     if df is not None:
-        # 🧽 Clean uploaded data
+        # Clean uploaded data
         cleaned_df = clean_data(df, uploaded_file.name)
 
         st.subheader("🧹 Cleaned Data Preview")
@@ -96,9 +88,7 @@ if uploaded_file:
         st.success("✅ Columns successfully aligned using reference header template.")
         st.dataframe(aligned_df.head(5), width='stretch')
 
-        # ============================================================
-        # 🧩 COLUMN SELECTION
-        # ============================================================
+       # Column Selection
         st.divider()
         st.subheader("🧩 Column Selection")
 
@@ -111,16 +101,14 @@ if uploaded_file:
 
         excluded_columns = [col for col in all_columns if col not in selected_columns]
 
-        # 📋 Show excluded columns
+        # Show excluded columns
         st.markdown("#### ❌ Columns Not Included")
         if excluded_columns:
             st.write(", ".join(excluded_columns))
         else:
             st.info("✅ All columns are currently included in the output.")
 
-        # ============================================================
-        # ✅ FINAL FILTERED DATAFRAME
-        # ============================================================
+        # Final DataFrame based on selected columns
         if selected_columns:
             final_df = aligned_df[selected_columns]
 
@@ -144,9 +132,7 @@ if uploaded_file:
                     st.dataframe(not_found_df, width='stretch')
                 
 
-            # ============================================================
-            # 📥 EXPORT FINAL ALIGNED FILE
-            # ============================================================
+           # Export Aligned Data
             match = re.search(r"c(\d+)", uploaded_file.name.lower())
             cycle = match.group(1).zfill(2) if match else "N/A"
             today_str = datetime.now().strftime("%m-%d-%Y")

@@ -2,7 +2,16 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-st.title("FIELD RESULT Automation Export")
+st.set_page_config(
+    page_title="Field Autostat",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+
+st.title("🛵 FIELD RESULT Automation Export")
+st.caption("Upload an create excel file for FIELD RESULT Autostat.")
+st.divider()
 
 # ---- Upload File ----
 uploaded_file = st.file_uploader("Upload your CSV/Excel file", type=["csv", "xlsx"])

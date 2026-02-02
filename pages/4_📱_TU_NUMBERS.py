@@ -5,6 +5,8 @@ import numpy as np
 from io import BytesIO
 from utils.helpers import read_excel_file
 
+
+# --- Page Setup ---
 st.title("📞 TU Numbers Splitter & Validator")
 
 st.divider()
@@ -31,7 +33,7 @@ else:
 
         st.write("---")
 
-         # ---------------- Helper functions ---------------- #
+         # --- Helper functions ---
         def to_str(val):
             if pd.isna(val):
                 return ""
@@ -93,7 +95,7 @@ else:
             pattern_landline = re.compile(r"^0\d{8,9}$")  # e.g., 0286871817
 
             return bool(pattern_mobile.match(val) or pattern_landline.match(val))
-        # ---------------- Main process ---------------- #
+        # --- Main process ----
         if st.button("🚀 Process TU NUMBERS"):
             working = df[[ch_col, tu_col]].copy()
             working.columns = ["CH CODE", "TU_RAW"]

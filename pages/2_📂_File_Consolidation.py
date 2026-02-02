@@ -6,7 +6,7 @@ import os
 from io import BytesIO
 from utils.helpers import generate_excel_download, read_excel_file
 
-# === Page setup ===
+# -- Page Setup ---
 st.title("📂 Excel File Consolidation")
 st.caption("Merge multiple Excel files into a single consolidated file without altering any data or formatting.")
 st.divider()
