@@ -1,42 +1,29 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+from datetime import datetime
 
-st.set_page_config(
-    page_title="Field Autostat",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.title("FIELD RESULT Automation Export")
 
-
-st.title("🛵 FIELD RESULT Automation Export")
-st.caption("Upload an create excel file for FIELD RESULT Autostat.")
-st.divider()
-
-# ---- Upload File ----
 uploaded_file = st.file_uploader("Upload your CSV/Excel file", type=["csv", "xlsx"])
 
 if uploaded_file:
-    # Read file
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.read_excel(uploaded_file, sheet_name="RESULT")
-
-    # ---- Required Columns Check ----
-    required_cols = [
+    USE_COLS = [
         'PLACEMENT', 'DATE', 'TIME', 'status', 'Message',
         'chcode', 'PTP-Date', 'PTP AMOUNT'
     ]
 
-    missing = [c for c in required_cols if c not in df.columns]
-    if missing:
-        st.error(f"Missing required columns: {missing}")
-        st.stop()
+    # ---- Read File (FASTER) ----
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file, usecols=USE_COLS)
+    else:
+        df = pd.read_excel(uploaded_file, sheet_name="RESULT", usecols=USE_COLS)
 
-    # ---- Date Handling ----
+    # ---- Datetime Handling (ONE PASS) ----
     df['DATE'] = pd.to_datetime(df['DATE'], errors='coerce')
     df['TIME'] = pd.to_timedelta(df['TIME'].astype(str), errors='coerce')
+    df['REMARK_DATETIME'] = df['DATE'] + df['TIME']
+
     df = df.dropna(subset=['DATE'])
 
     st.success("File uploaded successfully!")
@@ -47,35 +34,26 @@ if uploaded_file:
     max_date = df['DATE'].dt.date.max()
 
     with st.form("filter_form"):
-        selected_placement = st.multiselect(
-            "Select PLACEMENT(s):",
-            options=placement_options
-        )
-
+        selected_placement = st.multiselect("Select PLACEMENT(s):", placement_options)
         selected_date_range = st.date_input(
             "Select Date Range",
-            value=[min_date, max_date],
+            [min_date, max_date],
             min_value=min_date,
             max_value=max_date
         )
-
         submit = st.form_submit_button("Run Automation")
 
-    # ---- Apply Filters & Build Final Output ----
     if submit:
-        if isinstance(selected_date_range, (list, tuple)) and len(selected_date_range) == 2:
-            start_date, end_date = selected_date_range
-        else:
-            st.error("Please select a valid start and end date.")
-            st.stop()
+        start_date, end_date = selected_date_range
 
-        filtered_df = df[
-            (df['PLACEMENT'].isin(selected_placement)) &
-            (df['DATE'].dt.date >= start_date) &
-            (df['DATE'].dt.date <= end_date)
-        ].copy()
+        # ---- FAST filtering ----
+        mask = (
+            df['PLACEMENT'].isin(selected_placement) &
+            df['DATE'].dt.date.between(start_date, end_date)
+        )
+        f = df.loc[mask]
 
-        # ---- Action Status Mapping ----
+        # ---- Mappings ----
         action_status_map = {
             'PTP': 'PTP - PASTDUE_FLD VST',
             'NEG': 'FIELD VISIT - VST RESULT_NEG',
@@ -84,73 +62,60 @@ if uploaded_file:
             'TP': 'FIELD VISIT - VST RESULT_POS THIRD PARTY'
         }
 
-        # ---- Build Output DataFrame ----
-        output = pd.DataFrame()
-
-        output['chcode'] = filtered_df['chcode']
-        output['Action Status'] = filtered_df['status'].map(action_status_map)
-
-        # Remark Date = DATE + TIME
-        remark_datetime = filtered_df['DATE'] + filtered_df['TIME']
-        output['Remark Date'] = remark_datetime.dt.strftime("%m/%d/%Y %I:%M:%S %p")
-
-        # PTP Date
-        output['PTP Date'] = pd.to_datetime(
-            filtered_df['PTP-Date'], errors='coerce'
-        ).dt.strftime("%m/%d/%Y")
-
-        # Reason For Default (blank)
-        output['Reason For Default'] = ""
-
-        # Field Visit Date
-        output['Field Visit Date'] = remark_datetime.dt.strftime("%m/%d/%Y")
-
-        # Remark
-        output['Remark'] = (
-            "| Remarks: " +
-            output['Field Visit Date'] +
-            " FIELD RESULT : " +
-            filtered_df['Message'].astype(str)
-        )
-
-        # Next Call Date (blank)
-        output['Next Call Date'] = ""
-
-        # PTP Amount
-        output['PTP Amount'] = filtered_df['PTP AMOUNT'].replace([0, ""], pd.NA)
-
-        # Claim Paid Amount (blank)
-        output['Claim Paid Amount'] = ""
-
-        # Remark By (Placement based)
-        output['Remark By'] = filtered_df['PLACEMENT'].map({
+        remark_by_map = {
             'BPI CARDS 30 DPD': 'RALOPE',
-            'BPI CARDS XDAYS': 'MMMEJIA'
+            'BPI CARDS XDAYS': 'MMMEJIA',
+            'BPI PL XDAYS': 'JGCELIZ',
+            'BPI PL 30DPD': 'APLADIP',
+            'BPI PL 60DPD': 'NNLUQUIAS',
+            'BPI RBANK CARDS 30DPD': 'MIMFERNANDEZ',
+            'BPI RBANK PL SL': 'MIMFERNANDEZ',
+            'ROBINSONS': 'JGCULDURA'
+        }
+
+        # ---- Build Output (FAST) ----
+        output = pd.DataFrame({
+            'chcode': f['chcode'],
+            'Action Status': f['status'].map(action_status_map),
+            'Remark Date': f['REMARK_DATETIME'].dt.strftime("%m/%d/%Y %I:%M:%S %p"),
+            'PTP Date': pd.to_datetime(f['PTP-Date'], errors='coerce').dt.strftime("%m/%d/%Y"),
+            'Reason For Default': "",
+            'Field Visit Date': f['REMARK_DATETIME'].dt.strftime("%m/%d/%Y"),
+            'Remark': "| Remarks: " +
+                      #f['REMARK_DATETIME'].dt.strftime("%m/%d/%Y"# +
+                      " FIELD RESULT : " + f['Message'].astype(str),
+            'Next Call Date': "",
+            'PTP Amount': f['PTP AMOUNT'].replace([0, ""], pd.NA),
+            'Claim Paid Amount': "",
+            'Remark By': f['PLACEMENT'].map(remark_by_map),
+            'Phone No.': "",
+            'Relation': "",
+            'Claim Paid Date': ""
         })
 
-        # Remaining blank columns
-        output['Phone No.'] = ""
-        output['Relation'] = ""
-        output['Claim Paid Date'] = ""
-
-        # ---- Display Result ----
         st.subheader("Automation Output")
         st.dataframe(output, use_container_width=True)
 
-        # ---- Download Excel ----
-        def to_excel(df):
-            output_buffer = BytesIO()
-            with pd.ExcelWriter(output_buffer, engine="openpyxl") as writer:
+        # ---- Cached Excel Writer ----
+        @st.cache_data
+        def to_excel_fast(df):
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
                 df.to_excel(writer, index=False, sheet_name="UPLOAD")
-            return output_buffer.getvalue()
+            return buffer.getvalue()
 
-        excel_data = to_excel(output)
+        excel_data = to_excel_fast(output)
+
+        filename = (
+            f"FIELD_RESULT_{datetime.now():%Y-%m-%d}_"
+            f"{'_'.join(selected_placement) if selected_placement else 'ALL'}.xlsx"
+        )
 
         st.download_button(
             "Download Automation File",
-            data=excel_data,
-            file_name="FIELD_RESULT_AUTOMATION.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            excel_data,
+            filename,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
         st.caption(f"Rows generated: **{len(output):,}**")
