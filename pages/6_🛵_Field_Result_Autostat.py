@@ -70,7 +70,9 @@ if uploaded_file:
             'BPI PL 60DPD': 'NNLUQUIAS',
             'BPI RBANK CARDS 30DPD': 'MIMFERNANDEZ',
             'BPI RBANK PL SL': 'MIMFERNANDEZ',
-            'ROBINSONS': 'JGCULDURA'
+            'CARDS RECOV': 'JDCULDORA',
+            'RECOVERY': "JDCULDORA",
+            'BUCKET 4': "JDCULDORA"
         }
 
         # ---- Build Output (FAST) ----
