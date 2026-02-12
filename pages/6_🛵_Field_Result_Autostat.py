@@ -71,6 +71,7 @@ if uploaded_file:
             'BPI RBANK CARDS 30DPD': 'MIMFERNANDEZ',
             'BPI RBANK PL SL': 'MIMFERNANDEZ',
             'CARDS RECOV': 'JDCULDORA',
+            'RECOV': "JDCULDORA",
             'RECOVERY': "JDCULDORA",
             'BUCKET 4': "JDCULDORA"
         }
