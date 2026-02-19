@@ -12,7 +12,7 @@ Compare yesterday's and today's worklists to identify changes in customer contac
 """)
 
 # Columns to compare
-COLUMNS_TO_COMPARE = ["CUST_ID", "CUST_NAME", "OFFICE_PH", "HOME_PH", "MOBILE_NO"]
+COLUMNS_TO_COMPARE = ["CUST_ID", "CUST_NAME", "OFC", "HOME", "MOBILE_NO"]
 
 def load_and_validate_file(uploaded_file):
     """Load Excel file and validate required columns"""
@@ -31,6 +31,14 @@ def load_and_validate_file(uploaded_file):
     except Exception as e:
         st.error(f"❌ Error loading file: {str(e)}")
         return None
+
+
+def clean_phone_number(phone):
+    """Remove special characters from phone numbers"""
+    import re
+    if pd.isna(phone):
+        return ''
+    return re.sub(r'[^0-9a-zA-Z]', '', str(phone))
 
 
 def compare_worklists(yesterday_df, today_df):
@@ -65,13 +73,13 @@ def compare_worklists(yesterday_df, today_df):
                 'CHANGE_TYPE': 'NEW',
                 'YESTERDAY_MOBILE_NO': 'N/A',
                 'TODAY_MOBILE_NO': today_mobile,
-                'YESTERDAY_OFFICE_PH': 'N/A',
-                'TODAY_OFFICE_PH': today_row['OFFICE_PH'],
-                'YESTERDAY_HOME_PH': 'N/A',
-                'TODAY_HOME_PH': today_row['HOME_PH'],
+                'YESTERDAY_OFC': 'N/A',
+                'TODAY_OFC': today_row['OFC'],
+                'YESTERDAY_HOME': 'N/A',
+                'TODAY_HOME': today_row['HOME'],
                 'YESTERDAY_CUST_NAME': 'N/A',
                 'TODAY_CUST_NAME': today_row['CUST_NAME'],
-                'COLUMNS_CHANGED_LIST': ['CUST_NAME', 'OFFICE_PH', 'HOME_PH', 'MOBILE_NO']
+                'COLUMNS_CHANGED_LIST': ['CUST_NAME', 'OFC', 'HOME', 'MOBILE_NO']
             })
         else:
             # Customer exists, check for differences
@@ -89,23 +97,27 @@ def compare_worklists(yesterday_df, today_df):
                 change_detail['YESTERDAY_CUST_NAME'] = yesterday_row['CUST_NAME']
                 change_detail['TODAY_CUST_NAME'] = today_row['CUST_NAME']
             
-            if str(yesterday_row['OFFICE_PH']) != str(today_row['OFFICE_PH']):
-                columns_changed.append('OFFICE_PH')
-                columns_changed_overall.add('OFFICE_PH')
-                change_detail['YESTERDAY_OFFICE_PH'] = yesterday_row['OFFICE_PH']
-                change_detail['TODAY_OFFICE_PH'] = today_row['OFFICE_PH']
+            yesterday_ofc_clean = clean_phone_number(yesterday_row['OFC'])
+            today_ofc_clean = clean_phone_number(today_row['OFC'])
+            if yesterday_ofc_clean != today_ofc_clean:
+                columns_changed.append('OFC')
+                columns_changed_overall.add('OFC')
+                change_detail['YESTERDAY_OFC'] = yesterday_row['OFC']
+                change_detail['TODAY_OFC'] = today_row['OFC']
             else:
-                change_detail['YESTERDAY_OFFICE_PH'] = yesterday_row['OFFICE_PH']
-                change_detail['TODAY_OFFICE_PH'] = today_row['OFFICE_PH']
+                change_detail['YESTERDAY_OFC'] = yesterday_row['OFC']
+                change_detail['TODAY_OFC'] = today_row['OFC']
             
-            if str(yesterday_row['HOME_PH']) != str(today_row['HOME_PH']):
-                columns_changed.append('HOME_PH')
-                columns_changed_overall.add('HOME_PH')
-                change_detail['YESTERDAY_HOME_PH'] = yesterday_row['HOME_PH']
-                change_detail['TODAY_HOME_PH'] = today_row['HOME_PH']
+            yesterday_home_clean = clean_phone_number(yesterday_row['HOME'])
+            today_home_clean = clean_phone_number(today_row['HOME'])
+            if yesterday_home_clean != today_home_clean:
+                columns_changed.append('HOME')
+                columns_changed_overall.add('HOME')
+                change_detail['YESTERDAY_HOME'] = yesterday_row['HOME']
+                change_detail['TODAY_HOME'] = today_row['HOME']
             else:
-                change_detail['YESTERDAY_HOME_PH'] = yesterday_row['HOME_PH']
-                change_detail['TODAY_HOME_PH'] = today_row['HOME_PH']
+                change_detail['YESTERDAY_HOME'] = yesterday_row['HOME']
+                change_detail['TODAY_HOME'] = today_row['HOME']
             
             if str(yesterday_row['MOBILE_NO']) != str(today_row['MOBILE_NO']):
                 columns_changed.append('MOBILE_NO')
@@ -139,13 +151,13 @@ def compare_worklists(yesterday_df, today_df):
                 'CHANGE_TYPE': 'DELETED',
                 'YESTERDAY_MOBILE_NO': yesterday_row['MOBILE_NO'],
                 'TODAY_MOBILE_NO': 'N/A',
-                'YESTERDAY_OFFICE_PH': yesterday_row['OFFICE_PH'],
-                'TODAY_OFFICE_PH': 'N/A',
-                'YESTERDAY_HOME_PH': yesterday_row['HOME_PH'],
-                'TODAY_HOME_PH': 'N/A',
+                'YESTERDAY_OFC': yesterday_row['OFC'],
+                'TODAY_OFC': 'N/A',
+                'YESTERDAY_HOME': yesterday_row['HOME'],
+                'TODAY_HOME': 'N/A',
                 'YESTERDAY_CUST_NAME': yesterday_row['CUST_NAME'],
                 'TODAY_CUST_NAME': 'N/A',
-                'COLUMNS_CHANGED_LIST': ['CUST_NAME', 'OFFICE_PH', 'HOME_PH', 'MOBILE_NO']
+                'COLUMNS_CHANGED_LIST': ['CUST_NAME', 'OFC', 'HOME', 'MOBILE_NO']
             })
     
     changes_df = pd.DataFrame(changes)
