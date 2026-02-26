@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
-from openpyxl.styles import PatternFill
 
 st.set_page_config(page_title="Worklist Comparison Checker", layout="wide")
 st.title("📑 Worklist Comparison Checker")
+st.caption("Upload yerday and today file to automatically compare the file contact number")
+st.divider()
 
 st.markdown("""
 Compare yesterday's and today's worklists to identify changes in customer contact information.  
@@ -14,10 +15,6 @@ Compare yesterday's and today's worklists to identify changes in customer contac
 
 COLUMNS = ["CUST_ID", "CUST_NAME", "OFC", "HOME", "MOBILE_NO"]
 
-
-# -------------------------
-# Utilities
-# -------------------------
 
 def format_mobile(mobile):
     if pd.isna(mobile):
@@ -39,7 +36,9 @@ def load_file(file):
 
         df = df[COLUMNS].copy()
         df["MOBILE_NO"] = df["MOBILE_NO"].apply(format_mobile)
-        df["CUST_ID"] = df["CUST_ID"].astype(str)
+        df["CUST_ID"] = df["CUST_ID"].astype(str).str.strip()
+        df["CUST_ID"] = df["CUST_ID"].apply(lambda x: x if x.startswith("0") else "0" + x)
+
 
         return df
 
@@ -47,10 +46,6 @@ def load_file(file):
         st.error(f"Error loading file: {e}")
         return None
 
-
-# -------------------------
-# Core Comparison (Optimized)
-# -------------------------
 
 def compare_worklists(yesterday, today):
 
@@ -86,7 +81,16 @@ def compare_worklists(yesterday, today):
                 old_val = row[f"{col}_OLD"]
                 new_val = row[f"{col}_NEW"]
 
-                if str(old_val) != str(new_val):
+                # Normalize NaN to empty string
+                old_val = "" if pd.isna(old_val) else str(old_val).strip()
+                new_val = "" if pd.isna(new_val) else str(new_val).strip()
+
+                # 🔴 SPECIAL RULE:
+                # If OLD has value but NEW is blank → IGNORE
+                if old_val != "" and new_val == "":
+                    continue
+
+                if old_val != new_val:
                     changed_cols.append(col)
                     changed_columns_global.add(col)
 
@@ -112,10 +116,6 @@ def compare_worklists(yesterday, today):
     return changes_df, summary, changed_columns_global
 
 
-# -------------------------
-# Generate Updated File
-# -------------------------
-
 def generate_updated(today, changes_df, changed_columns):
 
     updated = changes_df[changes_df["CHANGE_TYPE"] == "UPDATED"]
@@ -136,10 +136,6 @@ def generate_updated(today, changes_df, changed_columns):
 
     return today_filtered[columns]
 
-
-# -------------------------
-# UI
-# -------------------------
 
 col1, col2 = st.columns(2)
 
@@ -176,7 +172,6 @@ if yesterday_file and today_file:
         else:
             st.success("No changes detected.")
 
-        # Updated Records Only
         st.header("📝 Updated Records Only")
         updated_df = generate_updated(today_df, changes_df, changed_columns)
 
@@ -192,15 +187,6 @@ if yesterday_file and today_file:
 
                 ws = writer.sheets["Updated"]
 
-                fill = PatternFill(start_color="FFEB9C",
-                                   end_color="FFEB9C",
-                                   fill_type="solid")
-
-                for row in ws.iter_rows(min_row=2,
-                                        max_row=len(updated_df) + 1):
-                    for cell in row:
-                        cell.fill = fill
-
                 # Force MOBILE_NO as text
                 if "MOBILE_NO" in updated_df.columns:
                     col_idx = updated_df.columns.get_loc("MOBILE_NO") + 1
@@ -215,7 +201,7 @@ if yesterday_file and today_file:
             st.download_button(
                 "📥 Download Updated (Excel)",
                 buffer,
-                f"updated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                f"updated_{datetime.now().strftime('%m%d%Y')}.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 

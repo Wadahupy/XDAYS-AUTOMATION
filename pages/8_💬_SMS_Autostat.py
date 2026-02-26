@@ -4,6 +4,8 @@ from io import BytesIO
 from datetime import datetime, timedelta
 
 st.title("CYN BLASTING Automation (Active File Updated Headers)")
+st.caption("Upload an CYN Blasting file to automatically generate a remarks.")
+st.divider()
 
 # ===== FILE UPLOADS =====
 blast_file = st.file_uploader("Upload CYN Blasting File", type=["csv", "xlsx"])

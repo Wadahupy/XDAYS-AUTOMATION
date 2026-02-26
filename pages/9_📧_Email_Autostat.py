@@ -3,10 +3,19 @@ import pandas as pd
 from io import BytesIO
 from datetime import datetime, timedelta
 
+<<<<<<< HEAD
 st.title("CYN BLASTING Automation (Active File Updated Headers)")
 
 # ===== FILE UPLOADS =====
 blast_file = st.file_uploader("Upload CYN Blasting File", type=["csv", "xlsx"])
+=======
+st.title("EMAIL BLASTING Automation")
+st.caption("Upload an Email Blasting file to automatically generate a remarks.")
+st.divider()
+
+# ===== FILE UPLOADS =====
+blast_file = st.file_uploader("Upload Email Blasting File", type=["csv", "xlsx"])
+>>>>>>> 5a9130a423af4a1197d5c4e96f3514f0f2f5ce58
 active_file = st.file_uploader("Upload Active File", type=["csv", "xlsx"])
 
 if blast_file and active_file:
@@ -41,7 +50,11 @@ if blast_file and active_file:
         st.stop()
 
     # ===== USER INPUT =====
+<<<<<<< HEAD
     with st.form("cyn_form"):
+=======
+    with st.form("email_form"):
+>>>>>>> 5a9130a423af4a1197d5c4e96f3514f0f2f5ce58
         base_date = st.date_input("Base Date (C3)", datetime.today())
         hour_offset = st.number_input("Hour Offset (E3)", value=0)
         submit = st.form_submit_button("Run Automation")
@@ -74,7 +87,11 @@ if blast_file and active_file:
             lambda x: "for checking" if pd.isna(x) else "ok to proceed"
         )
 
+<<<<<<< HEAD
         output['Action Status'] = "EMAIL SENT - BLAST SMS"
+=======
+        output['Action Status'] = "SMS SENT - BLAST SMS"
+>>>>>>> 5a9130a423af4a1197d5c4e96f3514f0f2f5ce58
         output['Remark Date'] = remark_datetime.strftime("%m/%d/%Y %I:%M:%S %p")
         output['PTP Date'] = ""
         output['Reason For Default'] = ""
@@ -84,7 +101,11 @@ if blast_file and active_file:
 
         output['Remark'] = (
             output['Phone No.'] +
+<<<<<<< HEAD
             " - EMAIL Sent EMAIL Blast: " +
+=======
+            " - SMS Sent SMS Blast: " +
+>>>>>>> 5a9130a423af4a1197d5c4e96f3514f0f2f5ce58
             df['TEMPLATE'].astype(str) +
             " template"
         )
@@ -136,10 +157,17 @@ if blast_file and active_file:
 
         excel_data = to_excel(final_output)
 
+<<<<<<< HEAD
         filename = f"CYN_BLASTING_IMPORT_{datetime.now():%Y-%m-%d}.xlsx"
 
         st.download_button(
             "Download CYN BLASTING File",
+=======
+        filename = f"EMAIL_BLASTING_IMPORT_{datetime.now():%Y-%m-%d}.xlsx"
+
+        st.download_button(
+            "Download EMAIL BLASTING File",
+>>>>>>> 5a9130a423af4a1197d5c4e96f3514f0f2f5ce58
             excel_data,
             filename,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
