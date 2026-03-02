@@ -136,11 +136,20 @@ if uploaded_file:
             return str(x).strip()
 
     for col in df_mapped.columns:
-        if col.startswith("accountNumber") or col.startswith("phone"):
+
+        # --- Special rule: Auto Curing accountNumber (NO leading zero) ---
+        if placement_name == "BPI AUTO CURING SL" and col.startswith("accountNumber"):
+            df_mapped[col] = df_mapped[col].apply(
+                lambda x: "" if pd.isna(x) or str(x).strip() == ""
+                else str(int(float(x))) if str(x).replace('.', '', 1).isdigit()
+                else str(x).strip()
+            )
+
+        # --- Default rule (with leading zero) ---
+        elif col.startswith("accountNumber") or col.startswith("phone"):
             df_mapped[col] = df_mapped[col].apply(clean_number)
 
-
-        # --- Auto Assign assignedTeam Based on Placement ---
+    # --- Auto Assign assignedTeam Based on Placement ---
     if placement_name == "BPI AUTO CURING SL":
         df_mapped["assignedTeam"] = "BPI AUTO CURING SL TEAM 1"
 
